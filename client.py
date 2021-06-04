@@ -1,5 +1,4 @@
-from orbit import Orbit
-from user import User
+from models import User, Orbit
 import os, json
 
 orbit_token = os.environ.get('orbit_key')
