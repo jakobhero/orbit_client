@@ -1,4 +1,4 @@
-import requests, json
+import requests, json, re, warnings
 
 class User:
     def __init__(self, **kwargs):
@@ -12,6 +12,46 @@ class User:
         """
         return self.github if self.github != None else self.email
 
+    @property
+    def email(self):
+        return self.__email
+    
+    @email.setter
+    def email(self, email):
+        #don't check for validity if user does not have email
+        if email == None:
+            self.__email = None
+        #check for email validity with regex
+        elif(re.search('^(\w|\.|\_|\-)+[@](\w|\_|\-|\.)+[.]\w{2,3}$', email)):
+            self.__email = email
+        else:
+            self.__email = None
+            warnings.warn(f"Email '{str(email)}' is not valid. No email is set.")
+    
+    @property
+    def name(self):
+        return self.__name
+    
+    @name.setter
+    def name(self, name):
+        if isinstance(name, str):
+            self.__name = name
+        else:
+            self.__name = None
+            warnings.warn(f"Name requires a String datatype, passed was {type(name)}.")
+    
+    @property
+    def github(self):
+        return self.__github
+    
+    @github.setter
+    def github(self, github):
+        if isinstance(github, str):
+            self.__github = github
+        else: 
+            self.__github = None
+            warnings.warn(f"Github requires a String datatype, passed was {type(github)}.")
+
 class Orbit:
     def __init__(self, key, workspace):
         self.headers = {
@@ -23,7 +63,7 @@ class Orbit:
     
     def add_member(self, user):
         """
-        adds the User user to the current Orbit Workspace
+        adds a user to the current Orbit Workspace
         """
         def user_parser(user):
             """
