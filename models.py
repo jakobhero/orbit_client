@@ -1,10 +1,13 @@
 import requests, json, re, warnings
+from google.cloud import bigquery
+from datetime import datetime as dt
 
 class User:
     def __init__(self, **kwargs):
         self.email = kwargs.get('email', None)
         self.name = kwargs.get('name', None)
         self.github = kwargs.get('github', None)
+        self.created_at = kwargs.get('created_at', None)
 
     def get_id(self):
         """
@@ -26,7 +29,7 @@ class User:
             self.__email = email
         else:
             self.__email = None
-            warnings.warn(f"Email '{str(email)}' is not valid. No email is set.")
+            warnings.warn(f"Email '{str(email)}' is not valid. Email was set to None.")
     
     @property
     def name(self):
@@ -38,7 +41,7 @@ class User:
             self.__name = name
         else:
             self.__name = None
-            warnings.warn(f"Name requires a String datatype, passed was {type(name)}.")
+            warnings.warn(f"'name' requires a String datatype, not {type(name)}. Name was set to None.")
     
     @property
     def github(self):
@@ -50,7 +53,31 @@ class User:
             self.__github = github
         else: 
             self.__github = None
-            warnings.warn(f"Github requires a String datatype, passed was {type(github)}.")
+            warnings.warn(f"'github' requires a String datatype, not {type(github)}. Github slug was set to None.")
+
+    @property
+    def created_at(self):
+        return self.__created_at
+    
+    @created_at.setter
+    def created_at(self, created_at):
+        if isinstance(created_at, dt):
+            self.__created_at = created_at
+        else:
+            self.__created_at = None
+            warnings.warn(f"'created_at' requires a DateTime datatype, not {type(created_at)}. The attribute was set to None")
+    
+    def to_dict(self):
+        out = {}
+        if self.email != None:
+            out['email'] = self.email
+        if self.name != None:
+            out['name'] = self.name
+        if self.github != None:
+            out['github'] = self.github
+        if self.created_at != None:
+            out['created_at'] = self.created_at
+        return out
 
 class Orbit:
     def __init__(self, key, workspace):
@@ -94,3 +121,44 @@ class Orbit:
         """
         endpoint =  "https://app.orbit.love/api/v1/"+self.workspace+"/members/"+user_id
         return requests.get(endpoint, headers = self.headers).json()
+
+class BQJob:
+    def __init__(self, **kwargs):
+        self.query = kwargs.get('query', None)
+        self.result = None
+    
+    @property
+    def query(self):
+        return self.__query
+    
+    @query.setter
+    def query(self, query):
+        if isinstance(query, str):
+            self.__query = query
+        else:
+            self.__query = None
+            warnings.warn(f"Query must be passed as String, not {type(query)}. Query was set to None.")
+        
+    @property
+    def result(self):
+        return self.__result
+    
+    @result.setter
+    def result(self, result):
+        self.__result = result
+
+    def execute(self):
+        """
+        This method executes queries against a user table that contains the columns 'name', 'email', 'github', and 'created_at'.
+        """
+        if self.query == None:
+            warnings.warn("BQJob contains no query to execute. Please attach a query.")
+        else:
+            client = bigquery.Client()
+            self.result = []
+            for row in client.query(self.query):
+                self.result.append(User(email = row['email'], name = row['name'], github = row['github'], created_at = row['created_at']))
+    
+
+            
+
