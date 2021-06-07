@@ -1,4 +1,4 @@
-import requests, json, re, warnings
+import requests, json, re, warnings, time
 from google.cloud import bigquery
 from datetime import datetime as dt
 
@@ -113,14 +113,46 @@ class Orbit:
                  
         data = user_parser(user)
         endpoint  = "https://app.orbit.love/api/v1/"+self.workspace+"/members"
-        return requests.post(endpoint, data = data, headers = self.headers).json()
+        response = requests.post(endpoint, data = data, headers = self.headers)
+        if response.ok:
+            return response.json()
+        else:
+            return {}
 
     def get_member(self, user_id):
         """
         retrieve the member with the provided user_id from the current Orbit Workspace.
         """
         endpoint =  "https://app.orbit.love/api/v1/"+self.workspace+"/members/"+user_id
-        return requests.get(endpoint, headers = self.headers).json()
+        response = requests.get(endpoint, headers = self.headers)
+        if response.ok:
+            return response.json()
+        else:
+            return {}
+
+    def delete_member(self, user_id):
+        """
+        delete the member with the provided user_id from the current Orbit Workspace.
+        """
+        endpoint =  "https://app.orbit.love/api/v1/"+self.workspace+"/members/"+user_id
+        response = requests.delete(endpoint, headers = self.headers)
+        if response.ok:
+            return response.json()
+        else:
+            return {}
+    
+    def batch_job(self, function, batch, **kwargs):
+        rate_limit = kwargs.get('limit', 100)
+        timeout = kwargs.get('timeout', 1)
+        count = 0
+        response = []
+        for item in batch:
+            response.append(function(item))
+            count += 1
+            if count % rate_limit == 0:
+                print(f"{count} calls have been processed. Timing out for {timeout} seconds in order to stay under the rate limit")
+                time.sleep(timeout)
+        return response
 
 class BQJob:
     def __init__(self, **kwargs):
