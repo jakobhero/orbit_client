@@ -1,5 +1,6 @@
-import os
-from models import Accessor, Orbit, Integrator
+import os, logging, datetime as dt
+from orbit import Orbit
+from data_clients import Accessor, Integrator
 
 def enrichment():
     """
@@ -9,8 +10,9 @@ def enrichment():
     """
     #query the data
     bq_job = Accessor(query=os.environ.get('bq_query'))
-    bq_job.filter_time()
+    bq_job.filter_time(lower_limit = dt.date(year=2021,month=6,day=1),upper_limit = dt.date.today()-dt.timedelta(days = 3))
     bq_job.execute()
+    logging.info(f"{len(bq_job.result)} users have been retrieved.")
 
     #Send batch Job to Orbit
     orbit = Orbit(os.environ.get('orbit_key'),"gitpod")
@@ -20,9 +22,11 @@ def enrichment():
     users, langs = [], []
     for row in response:
         user_response, lang_response = orbit.parse_user_response(row)
-        users.append(user_response)
-        for lang in lang_response:
-            langs.append(lang)
+        if user_response != None:
+            users.append(user_response)
+        if lang_response != None:
+            for lang in lang_response:
+                langs.append(lang)
 
     #declaring jobs for the data injection
     jobs = [
@@ -38,14 +42,15 @@ def enrichment():
         }
     ]
 
-    #executing injection
+    #executing the injection
     for job in jobs:
         print(f"Executing Job '{job['name']}'...")
         integrator = Integrator(job['table'], job['payload'])
         integrator.execute()
-        print(f"{len(integrator.errors)} errors occurred.")
+        logging.info(f"{len(integrator.errors)} errors occurred.")
         for error in integrator.errors:
-            print(error)
+            logging.error(error)
 
 if __name__ == '__main__':
+    logging.basicConfig(filename = 'debug.log', level = logging.DEBUG)
     enrichment()

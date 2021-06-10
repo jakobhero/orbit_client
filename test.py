@@ -1,5 +1,6 @@
 import unittest, os, warnings
-from models import User, Orbit
+from user import User
+from orbit import Orbit
 
 class TestUser(unittest.TestCase):
     def test_valid_user(self):
