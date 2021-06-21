@@ -1,4 +1,4 @@
-import logging, requests, time, json, aiohttp, asyncio
+import logging, requests, time, json, asyncio, aiohttp
 
 class Orbit:
     def __init__(self, key, workspace):
@@ -28,16 +28,38 @@ class Orbit:
         """
                  
         data = self.user_parse(user)
-        logging.debug(f"Parsed User {str(user)} to the following request body:\n{data}")
+        logging.debug(f"Successfully parsed User {str(user)}. Making Orbit request now...")
         endpoint  = "https://app.orbit.love/api/v1/"+self.workspace+"/members"
         response = requests.post(endpoint, data = data, headers = self.headers)
         if response.ok:
             out = response.json()
-            logging.debug(f"Sent User {str(user)} to orbit and received the following response:\n{str(out)}")
-            return out
+            logging.debug(f"Successfully inserted user {str(user)} in Orbit.")
+            return {
+                "bigquery":user.to_dict(),
+                "orbit": out
+            }
         else:
             logging.debug(f"Sent User {str(user)} to orbit and Error occurred:\n{str(response)}")
             return {}
+    
+    async def async_add_member(self, session, user):
+        """
+        adds a user to the current Orbit Workspace in an asynchronous request
+        """  
+        data = self.user_parse(user)
+        logging.debug(f"Successfully parsed User {str(user)}. Making Orbit request now...")
+        endpoint  = "https://app.orbit.love/api/v1/"+self.workspace+"/members"
+        async with session.post(endpoint, data = data, headers = self.headers) as resp:        
+            if 200 <= resp.status <= 201:
+                response = await resp.json()
+                logging.debug(f"Successfully inserted user {str(user)} in Orbit.")
+                return {
+                    "bigquery":user.to_dict(),
+                    "orbit": response
+                }
+            else:
+                response = await resp.text()
+                logging.debug(f"Orbit request for User {str(user)} returned with status {resp.status}. Refer to return body below:\n{response}")
 
     def get_member(self, user_id):
         """
@@ -78,48 +100,6 @@ class Orbit:
                 time.sleep(timeout)
         return response
 
-    #TODO figure out async process downstream: what to pass as callback, how to manage request limit
-    # def add_batch(self,users, **kwargs):
-    #     """
-    #     adds all members passed in users to orbit with asynchronous calls. 'limit' and
-    #     'timeout' passed in the keywords manage how many asynchronous requests at most
-    #     are made before a specified timeout is called.
-    #     """
-    #     endpoint  = "https://app.orbit.love/api/v1/"+self.workspace+"/members"
-
-    #     async def post(data, session):
-    #         try:
-    #             async with session.post(endpoint, headers = self.headers, data = data) as response:
-    #                 return response
-    #         except Exception as e:
-    #             logging.debug(f"Error occurred!\n{str(e)}")
-
-    #     async def manage(users, limit, timeout):
-    #         results = []
-    #         count,errors = 0,0
-    #         while count < len(users):
-    #             batch = users[count:count+limit]
-    #             logging.debug(f'Sending requests {count+1}-{count+1+limit}...')
-    #             async with aiohttp.ClientSession() as session:
-    #                 response = await asyncio.gather(*[post(self.user_parse(user), session) for user in batch])
-    #                 if response.ok:
-    #                     logging.debug(f"Received OK Response:\n{str(response)}")
-    #                     results.add(response.json())
-    #                 else:
-    #                     errors += 1
-    #                     logging.debug(f"Error occurred!\n{str(response)}")
-    #             count+=limit
-    #             if count < len(users):
-    #                 logging.debug(f'Taking a timeout of {timeout} minute(s)...')
-    #                 time.sleep(timeout*60)
-    #         return results, errors
-        
-    #     limit = kwargs.get('limit', 100)
-    #     timeout = kwargs.get('timeout', 1)*60
-    #     results, errors = manage(users,limit,timeout)
-    #     logging.info(f'Finished the orbit insert job. {len(results)} users were inserted or updated successfully. {errors} users failed.')
-    #     return results
-
     @staticmethod
     def parse_user_response(response, **kwargs):
         """
@@ -127,9 +107,9 @@ class Orbit:
         specified by passing an array with the names in the keys keyword and renamed by passing a dictionary with the former
         name as keys and new names as values in the rename keyword. If no values are passed, defaults are assumed.
         """
-        if 'data' not in response:
+        if 'orbit' not in response or 'data' not in response['orbit']:
             return None, None
-        data = response['data']['attributes']
+        data = response['orbit']['data']['attributes']
         default_keys = [
             "github",
             "name",
@@ -159,6 +139,11 @@ class Orbit:
 
         #only store data specified in keys in user_response
         user_response = {key: data[key] for key in keys}
+
+        #add signup date of user
+        #TODO: This is a bridgegap solution. In the future, the date should come from a custom orbit event that records the Gitpod Signup.
+        if 'created_at' in response['bigquery']:
+            user_response['signup_date'] = response['bigquery']['created_at']
 
         #rename dictionary keys
         for old_key in rename.keys():

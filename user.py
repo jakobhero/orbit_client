@@ -74,7 +74,7 @@ class User:
         if self.github != None:
             out['github'] = self.github
         if self.created_at != None:
-            out['created_at'] = self.created_at
+            out['created_at'] = str(self.created_at)
         return out
     
     def __str__(self):
