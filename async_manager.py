@@ -46,6 +46,9 @@ class AsyncManager():
 
             #executing the injection
             for job in jobs:
+                if len(job['payload'] == 0):
+                    logging.info(f"Job '{job['name']} has empty payload. No call to BigQuery is made.")
+                    continue
                 logging.info(f"Executing Job '{job['name']}'...")
                 integrator = Integrator(job['table'], job['payload'])
                 integrator.execute()

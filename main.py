@@ -11,7 +11,7 @@ def enrichment():
     """
     #query the data
     bq_job = Accessor(query=os.environ.get('bq_query'))
-    bq_job.filter_time(lower_limit = dt.date(year=2021,month=6,day=20),upper_limit = dt.date(year=2021,month=6,day=21))
+    bq_job.filter_time(lower_limit = dt.date(year=2021,month=6,day=28),upper_limit = dt.date(year=2021,month=6,day=30))
     bq_job.execute()
     logging.info(f"{len(bq_job.result)} users have been retrieved.")
 
